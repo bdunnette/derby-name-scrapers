@@ -1,0 +1,44 @@
+name: Weekly Derby Name Scrape
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every Monday at 09:00 UTC
+    - cron: "0 9 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Scrape derby names
+        run: uv run python scrape_derby_names.py
+
+      - name: Commit updated CSV when changed
+        run: |
+          if git diff --quiet -- data/derby_names.csv; then
+            echo "No CSV changes detected"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/derby_names.csv
+          git commit -m "chore: weekly derby names refresh"
+          git push
