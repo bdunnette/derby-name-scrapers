@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import logging
 import re
 import string
 from pathlib import Path
@@ -19,6 +20,8 @@ DEFAULT_URLS = [
 
 ROSTER_BASE_URL = "https://rollerderbyroster.com/view-names/"
 
+LOGGER = logging.getLogger("derby_scraper")
+
 
 def fetch_html(url: str, timeout: int = 30) -> str:
     response = requests.get(
@@ -34,6 +37,11 @@ def fetch_html(url: str, timeout: int = 30) -> str:
     )
     response.raise_for_status()
     return response.text
+
+
+def configure_logging(verbose: bool) -> None:
+    level = logging.INFO if verbose else logging.WARNING
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
 
 
 def extract_names_from_dom(html: str) -> set[str]:
@@ -162,22 +170,34 @@ def main() -> int:
         help="Source page URL. Repeat to provide multiple URLs.",
     )
     parser.add_argument("--output", default="data/derby_names.csv", help="CSV output path")
+    parser.add_argument("--verbose", action="store_true", help="Enable progress logging")
     args = parser.parse_args()
+
+    configure_logging(args.verbose)
 
     urls = args.urls if args.urls else DEFAULT_URLS
     expanded_urls = expand_source_urls(urls)
+    LOGGER.info("Planned %d page(s) from %d source URL(s)", len(expanded_urls), len(urls))
 
     names: set[str] = set()
-    for url in expanded_urls:
+    for idx, url in enumerate(expanded_urls, start=1):
+        LOGGER.info("Fetching page %d/%d: %s", idx, len(expanded_urls), url)
         html = fetch_html(url)
         discovered = extract_names_from_dom(html)
+        method = "dom"
         if not discovered:
             discovered = extract_names_from_embedded_json(html)
+            method = "embedded_json"
+        LOGGER.info("Page %d yielded %d names via %s", idx, len(discovered), method)
         names.update(discovered)
+
+    LOGGER.info("Collected %d raw names before cleaning", len(names))
 
     cleaned = clean_names(names)
     if not cleaned:
         raise RuntimeError("No derby names found. The site structure may have changed.")
+
+    LOGGER.info("Retained %d names after dedupe/cleanup", len(cleaned))
 
     output_path = Path(args.output)
     write_csv(cleaned, output_path)
