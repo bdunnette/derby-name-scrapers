@@ -5,12 +5,12 @@ description = "Scrape roller derby names and export to CSV"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "beautifulsoup4>=4.12.3",
-  "requests>=2.32.3",
+  "beautifulsoup4>=4.15.0",
+  "requests>=2.34.2",
 ]
 
 [build-system]
-requires = ["hatchling>=1.29.0"]
+requires = ["hatchling>=1.31.0"]
 build-backend = "hatchling.build"
 
 [tool.uv]
